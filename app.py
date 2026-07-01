@@ -3,6 +3,7 @@ from pathlib import Path
 from urllib.parse import parse_qs
 import html
 import json
+import os
 import sqlite3
 from datetime import datetime
 
@@ -11,12 +12,35 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "checkins.sqlite3"
 STATIC_DIR = BASE_DIR / "static"
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE", "checkins")
 
 CLASS_LIMIT = 8
 CLASS_TIMES = ["06:00", "07:00", "12:00", "18:00", "19:00", "20:00"]
+_supabase_client = None
+
+
+def use_supabase():
+    return bool(SUPABASE_URL and SUPABASE_KEY)
+
+
+def get_supabase_client():
+    global _supabase_client
+    if _supabase_client is None:
+        try:
+            from supabase import create_client
+        except ImportError as exc:
+            raise RuntimeError(
+                "Instale a dependencia 'supabase' ou remova SUPABASE_URL/SUPABASE_KEY."
+            ) from exc
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _supabase_client
 
 
 def init_db():
+    if use_supabase():
+        return
     DATA_DIR.mkdir(exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
@@ -32,6 +56,21 @@ def init_db():
 
 
 def get_counts():
+    if use_supabase():
+        rows = (
+            get_supabase_client()
+            .table(SUPABASE_TABLE)
+            .select("class_time")
+            .execute()
+            .data
+        )
+        counts = {class_time: 0 for class_time in CLASS_TIMES}
+        for row in rows:
+            class_time = row.get("class_time")
+            if class_time in counts:
+                counts[class_time] += 1
+        return counts
+
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute(
             "SELECT class_time, COUNT(*) FROM checkins GROUP BY class_time"
@@ -42,6 +81,25 @@ def get_counts():
 
 
 def get_recent_checkins():
+    if use_supabase():
+        rows = (
+            get_supabase_client()
+            .table(SUPABASE_TABLE)
+            .select("student_name,class_time,created_at")
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+            .data
+        )
+        return [
+            (
+                row.get("student_name", ""),
+                row.get("class_time", ""),
+                row.get("created_at", ""),
+            )
+            for row in rows
+        ]
+
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute(
             """
@@ -61,6 +119,27 @@ def create_checkin(student_name, class_time):
     if class_time not in CLASS_TIMES:
         return False, "Selecione um horario valido."
 
+    if use_supabase():
+        client = get_supabase_client()
+        rows = (
+            client.table(SUPABASE_TABLE)
+            .select("id")
+            .eq("class_time", class_time)
+            .execute()
+            .data
+        )
+        if len(rows) >= CLASS_LIMIT:
+            return False, f"A turma das {class_time} ja atingiu o limite de {CLASS_LIMIT} alunos."
+
+        client.table(SUPABASE_TABLE).insert(
+            {
+                "student_name": clean_name,
+                "class_time": class_time,
+                "created_at": datetime.now().isoformat(timespec="seconds"),
+            }
+        ).execute()
+        return True, f"Check-in confirmado para {clean_name} as {class_time}."
+
     with sqlite3.connect(DB_PATH) as conn:
         total = conn.execute(
             "SELECT COUNT(*) FROM checkins WHERE class_time = ?", (class_time,)
@@ -79,8 +158,14 @@ def create_checkin(student_name, class_time):
 
 
 def render_home(message=None, success=True):
-    counts = get_counts()
-    recent = get_recent_checkins()
+    try:
+        counts = get_counts()
+        recent = get_recent_checkins()
+    except Exception:
+        counts = {class_time: 0 for class_time in CLASS_TIMES}
+        recent = []
+        message = "Nao foi possivel conectar ao banco de dados."
+        success = False
 
     time_options = "\n".join(
         f'<option value="{class_time}">{class_time} - {counts[class_time]}/{CLASS_LIMIT} vagas</option>'
@@ -174,10 +259,20 @@ class AppHandler(BaseHTTPRequestHandler):
             self.respond_html(render_home())
             return
         if self.path == "/api/health":
+            database_ok = False
+            try:
+                if use_supabase():
+                    get_supabase_client().table(SUPABASE_TABLE).select("id").limit(1).execute()
+                    database_ok = True
+                else:
+                    database_ok = DB_PATH.exists()
+            except Exception:
+                database_ok = False
             self.respond_json(
                 {
                     "status": "ok",
-                    "database": DB_PATH.exists(),
+                    "database": database_ok,
+                    "database_provider": "supabase" if use_supabase() else "sqlite",
                     "class_limit": CLASS_LIMIT,
                     "checked_at": datetime.now().isoformat(timespec="seconds"),
                 }
