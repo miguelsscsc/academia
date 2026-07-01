@@ -31,8 +31,11 @@ Controlar a quantidade de alunos por turma, evitando superlotacao e permitindo q
 |   `-- manual-recepcao.md
 |-- static/
 |   `-- styles.css
+|-- scripts/
+|   `-- test_supabase.py
 |-- supabase/
 |   `-- schema.sql
+|-- .env.example
 |-- requirements.txt
 |-- vercel.json
 `-- README.md
@@ -72,14 +75,28 @@ Para usar Supabase, crie a tabela executando o arquivo:
 supabase/schema.sql
 ```
 
-Depois configure as variaveis de ambiente:
+Depois crie um arquivo `.env` a partir de `.env.example` e preencha:
 
 ```text
 SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_KEY=sua-chave-anon-ou-service-role
+SUPABASE_KEY=sua-chave-anon-do-supabase
+SUPABASE_TABLE=checkins
 ```
 
 Opcionalmente, use `SUPABASE_TABLE` para trocar o nome da tabela. O padrao e `checkins`.
+
+Para testar a conexao localmente:
+
+```bash
+pip install -r requirements.txt
+python scripts/test_supabase.py
+```
+
+Se o teste responder `Conexao OK`, execute o site:
+
+```bash
+python app.py
+```
 
 ## Deploy na Vercel
 
