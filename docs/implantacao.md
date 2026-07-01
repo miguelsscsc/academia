@@ -5,7 +5,8 @@
 Empresa: Academia de Crossfit Forca & Foco  
 Sistema: check-in antecipado de aulas  
 Dominio simulado: `checkin.forcaefoco.com.br`  
-Ambiente alvo: servidor Linux em nuvem, com Python 3 e SQLite
+Ambiente alvo: servidor Linux em nuvem, com Python 3 e SQLite  
+Ambiente alternativo: Vercel com banco Supabase
 
 ## Infraestrutura provisionada
 
@@ -21,6 +22,38 @@ Para fins de entrega academica, o provisionamento foi planejado e simulado com o
 | Porta publica | 80/443 via proxy reverso |
 | Porta interna | 8000 |
 | Backup | Copia diaria do arquivo SQLite |
+
+## Infraestrutura Vercel + Supabase
+
+Para publicacao em plataforma serverless, o projeto tambem esta preparado para:
+
+| Recurso | Configuracao |
+| --- | --- |
+| Hospedagem | Vercel |
+| Entrada da aplicacao | `api/index.py` |
+| Roteamento | `vercel.json` |
+| Banco | Supabase/Postgres |
+| Schema | `supabase/schema.sql` |
+| Variaveis | `SUPABASE_URL`, `SUPABASE_KEY` |
+
+## Passos de implantacao na Vercel
+
+1. Criar um projeto no Supabase.
+2. Abrir o SQL Editor do Supabase e executar o conteudo de `supabase/schema.sql`.
+3. Criar um projeto na Vercel apontando para este repositorio.
+4. Configurar as variaveis de ambiente na Vercel:
+
+```text
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_KEY=sua-chave-anon-ou-service-role
+```
+
+5. Fazer o deploy pela Vercel.
+6. Validar o endpoint:
+
+```text
+https://seu-projeto.vercel.app/api/health
+```
 
 ## Passos de implantacao
 
@@ -88,7 +121,7 @@ Registros DNS simulados:
 ## Criterios de aceite
 
 - O formulario solicita nome do aluno e horario desejado.
-- O sistema grava o check-in no banco SQLite.
+- O sistema grava o check-in no banco configurado: Supabase em producao ou SQLite local.
 - A ocupacao das turmas e exibida na tela.
 - O sistema impede novas reservas quando o limite da turma e atingido.
 - O endpoint `/api/health` responde com `status: ok`.
