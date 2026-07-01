@@ -10,7 +10,8 @@ Controlar a quantidade de alunos por turma, evitando superlotacao e permitindo q
 
 - Formulario web de check-in com nome do aluno e horario desejado.
 - Validacao de limite de vagas por horario.
-- Armazenamento das reservas em banco SQLite.
+- Armazenamento das reservas em Supabase quando configurado.
+- Fallback local em SQLite para desenvolvimento sem variaveis de ambiente.
 - Listagem de reservas confirmadas.
 - Endpoint de saude para comprovacao de estabilidade do ambiente.
 - Documentacao de infraestrutura, dominio simulado e treinamento da recepcao.
@@ -19,16 +20,22 @@ Controlar a quantidade de alunos por turma, evitando superlotacao e permitindo q
 
 ```text
 .
-├── app.py
-├── data/
-│   └── .gitkeep
-├── docs/
-│   ├── evidencias-estabilidade.md
-│   ├── implantacao.md
-│   └── manual-recepcao.md
-├── static/
-│   └── styles.css
-└── README.md
+|-- api/
+|   `-- index.py
+|-- app.py
+|-- data/
+|   `-- .gitkeep
+|-- docs/
+|   |-- evidencias-estabilidade.md
+|   |-- implantacao.md
+|   `-- manual-recepcao.md
+|-- static/
+|   `-- styles.css
+|-- supabase/
+|   `-- schema.sql
+|-- requirements.txt
+|-- vercel.json
+`-- README.md
 ```
 
 ## Como executar localmente
@@ -53,22 +60,36 @@ http://localhost:8000/api/health
 
 ## Banco de dados
 
-O banco e criado automaticamente em:
+Sem variaveis de ambiente do Supabase, o banco local e criado automaticamente em:
 
 ```text
 data/checkins.sqlite3
 ```
 
-Tabela principal:
+Para usar Supabase, crie a tabela executando o arquivo:
 
-```sql
-CREATE TABLE checkins (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_name TEXT NOT NULL,
-  class_time TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
+```text
+supabase/schema.sql
 ```
+
+Depois configure as variaveis de ambiente:
+
+```text
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_KEY=sua-chave-anon-ou-service-role
+```
+
+Opcionalmente, use `SUPABASE_TABLE` para trocar o nome da tabela. O padrao e `checkins`.
+
+## Deploy na Vercel
+
+O projeto ja inclui:
+
+- `vercel.json` para redirecionar as rotas para a funcao Python.
+- `api/index.py` como entrada serverless da Vercel.
+- `requirements.txt` com a dependencia do Supabase.
+
+Na Vercel, adicione `SUPABASE_URL` e `SUPABASE_KEY` em **Settings > Environment Variables** antes de publicar.
 
 ## Entregaveis
 
